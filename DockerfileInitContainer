@@ -1,0 +1,15 @@
+FROM ubuntu:22.04
+
+WORKDIR /bin
+
+# Install root certs, see: https://github.com/paritytech/substrate/issues/9984
+ADD --chown=777 subkey .
+ADD --chown=777 initialize_keystore.sh .
+
+# Fail on build, if unable to run node
+RUN subkey --version
+RUN initialize_keystore.sh -v
+
+VOLUME [ "/config" ]
+
+ENTRYPOINT [ "initialize_keystore.sh" ]
