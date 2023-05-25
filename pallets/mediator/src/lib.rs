@@ -60,9 +60,6 @@ pub mod pallet {
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
-    // Dispatchable functions allows users to interact with the pallet and invoke state changes.
-    // These functions materialize as "extrinsics", which are often compared to transactions.
-    // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         #[pallet::weight(100000)]
@@ -70,16 +67,8 @@ pub mod pallet {
         pub fn organize_trades(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // ToDo: Fetch supply and demand from micro grids
+            // Trade matching logic
 
-            // let trade = Trade { amount: 0, price: 100, seller: None, buyer: None };
-            // let trade_id = T::Hashing::hash_of(&trade);
-            // <Trades<T>>::insert(trade_id, trade.clone());
-            //
-            // // Emit an event.
-            // Self::deposit_event(Event::TradeAdded(trade.amount.clone(), trade.price.clone(), trade.seller.clone(), trade.buyer.clone(), trade_id));
-
-            // Return a successful DispatchResultWithPostInfo
             Ok(())
         }
     }
