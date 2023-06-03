@@ -1,6 +1,5 @@
 pub mod energy_trade_matching {
     use std::cmp::Ordering;
-    use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     use std::ops::{Add, Div};
     use serde::{Serialize, Deserialize};
@@ -8,7 +7,8 @@ pub mod energy_trade_matching {
     pub fn generate_trades(energy_requests: &mut Vec<EnergyRequest>,
                            energy_offers: &mut Vec<EnergyOffer>,
                            grid_request: &EnergyRequest,
-                           grid_offer: &EnergyOffer) -> (Vec<Trade>, u64) {
+                           grid_offer: &EnergyOffer)
+                           -> Vec<Trade> {
         let mut trades = Vec::<Trade>::new();
 
         // Sort requests and offers amd turn to iters
@@ -22,7 +22,8 @@ pub mod energy_trade_matching {
         let mut off = offer_iter.next();
 
         // Create variables to store temporary surplus requests and offers
-        let mut surplus_req: EnergyRequest; let mut surplus_off: EnergyOffer;
+        let mut surplus_req: EnergyRequest;
+        let mut surplus_off: EnergyOffer;
 
         // Match trades
         while req.is_some() && off.is_some() {
@@ -30,7 +31,7 @@ pub mod energy_trade_matching {
                 (Some(r), Some(o)) => {
                     let t;
 
-                    if diff(r.price, o.price) < 0.1 {
+                    if r.price >= o.price {
                         let average_price = r.price.add(o.price).div(2.0);
 
                         // Create match for request and offer, and handle potential surplus
@@ -58,14 +59,11 @@ pub mod energy_trade_matching {
                                 req = Some(&surplus_req);
                             }
                         }
-                    } else if r.price < o.price {
+                    } else {
                         t = Trade { amount: r.amount, price: grid_offer.price, buyer: r.buyer.clone(), seller: grid_offer.seller.clone() };
                         req = request_iter.next();
-                    } else {
-                        t = Trade { amount: o.amount, price: grid_request.price, buyer: grid_request.buyer.clone(), seller: o.seller.clone() };
-                        off = offer_iter.next();
                     }
-                    trades.push(t)
+                    trades.push(t);
                 }
                 _ => break
             }
@@ -75,29 +73,17 @@ pub mod energy_trade_matching {
         while req.is_some() {
             let t = Trade { amount: req.unwrap().amount, price: grid_offer.price, buyer: req.unwrap().buyer.clone(), seller: grid_offer.seller.clone() };
             req = request_iter.next();
-            trades.push(t)
+            trades.push(t);
         }
 
         // Match remaining offers with grid
         while off.is_some() {
             let t = Trade { amount: off.unwrap().amount, price: grid_request.price, buyer: grid_request.buyer.clone(), seller: off.unwrap().seller.clone() };
             off = offer_iter.next();
-            trades.push(t)
+            trades.push(t);
         }
 
-        let hash = calculate_hash(&trades);
-
-        (trades, hash)
-    }
-
-    fn calculate_hash(trades: &Vec<Trade>) -> u64 {
-        let mut s = DefaultHasher::new();
-        trades.hash(&mut s);
-        s.finish()
-    }
-
-    fn diff(p0: f32, p1: f32) -> f32 {
-        (p0 - p1).abs() / p0
+        trades
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -106,12 +92,13 @@ pub mod energy_trade_matching {
         pub price: f32,
         pub buyer: String,
     }
+
     impl Clone for EnergyRequest {
         fn clone(&self) -> Self {
             EnergyRequest {
                 amount: self.amount.clone(),
                 price: self.price.clone(),
-                buyer: self.buyer.clone()
+                buyer: self.buyer.clone(),
             }
         }
     }
@@ -122,12 +109,13 @@ pub mod energy_trade_matching {
         pub price: f32,
         pub seller: String,
     }
+
     impl Clone for EnergyOffer {
         fn clone(&self) -> Self {
             EnergyOffer {
                 amount: self.amount.clone(),
                 price: self.price.clone(),
-                seller: self.seller.clone()
+                seller: self.seller.clone(),
             }
         }
     }
@@ -139,13 +127,14 @@ pub mod energy_trade_matching {
         pub buyer: String,
         pub seller: String,
     }
+
     impl Clone for Trade {
         fn clone(&self) -> Self {
             Trade {
                 amount: self.amount.clone(),
                 price: self.price.clone(),
                 buyer: self.buyer.clone(),
-                seller: self.seller.clone()
+                seller: self.seller.clone(),
             }
         }
     }
@@ -170,7 +159,7 @@ pub mod energy_trade_matching {
             let grid_request = EnergyRequest { amount: 10, price: 2.2, buyer: "grid".into() };
             let grid_offer = EnergyOffer { amount: 10, price: 2.2, seller: "grid".into() };
 
-            let (trades, _hash) = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
 
             assert_eq!(trades.len(), 0);
         }
@@ -186,7 +175,7 @@ pub mod energy_trade_matching {
             let grid_request = EnergyRequest { amount: 10, price: 2.0, buyer: "grid".into() };
             let grid_offer = EnergyOffer { amount: 10, price: 2.0, seller: "grid".into() };
 
-            let (trades, _hash) = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
 
             assert_eq!(trades.len(), 3);
         }
@@ -202,7 +191,7 @@ pub mod energy_trade_matching {
             let grid_request = EnergyRequest { amount: 10, price: 2.0, buyer: "grid".into() };
             let grid_offer = EnergyOffer { amount: 10, price: 2.0, seller: "grid".into() };
 
-            let (trades, _hash) = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
 
             assert_eq!(trades.len(), 3);
         }
@@ -222,31 +211,98 @@ pub mod energy_trade_matching {
             let grid_request = EnergyRequest { amount: 10, price: 2.0, buyer: "grid".into() };
             let grid_offer = EnergyOffer { amount: 10, price: 2.0, seller: "grid".into() };
 
-            let (trades, _hash) = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
 
             assert_eq!(trades.len(), 3);
             assert!(trades.iter().all(|t| t.buyer.ne("grid") && t.seller.ne("grid")));
         }
 
         #[test]
-        fn hashes_are_consistent() {
+        fn cheap_request_is_sold_to_the_grid_and_everything_else_is_peer_to_peer() {
             let mut requests = Vec::<EnergyRequest>::from([
                 EnergyRequest { amount: 10, price: 1.9, buyer: "buyer_1".into() },
                 EnergyRequest { amount: 10, price: 2.0, buyer: "buyer_2".into() },
-                EnergyRequest { amount: 10, price: 2.3, buyer: "buyer_3".into() }
+                EnergyRequest { amount: 10, price: 2.1, buyer: "buyer_3".into() },
+                EnergyRequest { amount: 10, price: 2.4, buyer: "buyer_4".into() },
+                EnergyRequest { amount: 10, price: 2.8, buyer: "buyer_5".into() }
             ]);
             let mut offers = Vec::<EnergyOffer>::from([
-                EnergyOffer { amount: 10, price: 1.9, seller: "seller_1".into() },
-                EnergyOffer { amount: 10, price: 2.0, seller: "seller_2".into() },
-                EnergyOffer { amount: 10, price: 2.3, seller: "seller_3".into() }
+                EnergyOffer { amount: 10, price: 2.0, seller: "seller_1".into() },
+                EnergyOffer { amount: 10, price: 2.1, seller: "seller_2".into() },
+                EnergyOffer { amount: 10, price: 2.3, seller: "seller_3".into() },
+                EnergyOffer { amount: 5, price: 2.3, seller: "seller_4".into() },
+                EnergyOffer { amount: 5, price: 2.7, seller: "seller_5".into() }
             ]);
+
             let grid_request = EnergyRequest { amount: 10, price: 2.0, buyer: "grid".into() };
             let grid_offer = EnergyOffer { amount: 10, price: 2.0, seller: "grid".into() };
 
-            let (_, hash_1) = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
-            let (_, hash_2) = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
 
-            assert_eq!(hash_1, hash_2);
+            // Assert that six trades are formed, only one involving the grid, and the grid is a seller
+            assert_eq!(trades.len(), 6);
+            assert_eq!(trades.iter().filter(|&t| t.buyer.eq("grid")).count(), 0);
+            assert_eq!(trades.iter().filter(|&t| t.seller.eq("grid")).count(), 1);
+        }
+
+        #[test]
+        fn offered_and_traded_amounts_match_including_grid() {
+            let mut requests = Vec::<EnergyRequest>::from([
+                EnergyRequest { amount: 10, price: 1.9, buyer: "buyer_1".into() },
+                EnergyRequest { amount: 10, price: 2.0, buyer: "buyer_2".into() },
+                EnergyRequest { amount: 10, price: 2.1, buyer: "buyer_3".into() },
+                EnergyRequest { amount: 10, price: 2.4, buyer: "buyer_4".into() },
+                EnergyRequest { amount: 10, price: 2.8, buyer: "buyer_5".into() }
+            ]);
+            let mut offers = Vec::<EnergyOffer>::from([
+                EnergyOffer { amount: 10, price: 2.0, seller: "seller_1".into() },
+                EnergyOffer { amount: 10, price: 2.1, seller: "seller_2".into() },
+                EnergyOffer { amount: 10, price: 2.3, seller: "seller_3".into() },
+                EnergyOffer { amount: 5, price: 2.3, seller: "seller_4".into() },
+                EnergyOffer { amount: 5, price: 2.7, seller: "seller_5".into() }
+            ]);
+
+            let grid_request = EnergyRequest { amount: 10, price: 2.0, buyer: "grid".into() };
+            let grid_offer = EnergyOffer { amount: 10, price: 2.0, seller: "grid".into() };
+
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+
+            trades.iter().for_each(|t| println!("{}", t.amount));
+
+            assert_eq!(offers.iter().map(|o| o.amount).sum::<u16>() + 10, trades.iter().map(|t| t.amount).sum::<u16>());
+        }
+
+        #[test]
+        fn all_buyers_and_sellers_are_included() {
+            let mut requests = Vec::<EnergyRequest>::from([
+                EnergyRequest { amount: 10, price: 1.9, buyer: "buyer_1".into() },
+                EnergyRequest { amount: 10, price: 2.0, buyer: "buyer_2".into() },
+                EnergyRequest { amount: 10, price: 2.1, buyer: "buyer_3".into() },
+                EnergyRequest { amount: 10, price: 2.4, buyer: "buyer_4".into() },
+                EnergyRequest { amount: 10, price: 2.8, buyer: "buyer_5".into() }
+            ]);
+            let mut offers = Vec::<EnergyOffer>::from([
+                EnergyOffer { amount: 10, price: 2.0, seller: "seller_1".into() },
+                EnergyOffer { amount: 10, price: 2.1, seller: "seller_2".into() },
+                EnergyOffer { amount: 10, price: 2.3, seller: "seller_3".into() },
+                EnergyOffer { amount: 5, price: 2.3, seller: "seller_4".into() },
+                EnergyOffer { amount: 5, price: 2.7, seller: "seller_5".into() }
+            ]);
+
+            let grid_request = EnergyRequest { amount: 10, price: 2.0, buyer: "grid".into() };
+            let grid_offer = EnergyOffer { amount: 10, price: 2.0, seller: "grid".into() };
+
+            let trades = generate_trades(&mut requests, &mut offers, &grid_request, &grid_offer);
+
+            // Check that all buyers are included in a trade
+            let buyers: Vec<&String> = requests.iter().map(|r| &r.buyer).collect();
+            let included_buyers: Vec<&String> = trades.iter().map(|t| &t.buyer).collect();
+            assert!(buyers.iter().all(|&b| included_buyers.iter().any(|&inc_b| b == inc_b)));
+
+            // Check that all sellers are included in a trade
+            let sellers: Vec<&String> = offers.iter().map(|o| &o.seller).collect();
+            let included_sellers: Vec<&String> = trades.iter().map(|t| &t.seller).collect();
+            assert!(sellers.iter().all(|&s| included_sellers.iter().any(|&inc_s| s == inc_s)));
         }
     }
 }
